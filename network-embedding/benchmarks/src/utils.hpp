@@ -20,12 +20,12 @@ namespace Utils {
 /* 
  * This function will sample in [0, range) for an integer not in existing 
  */
-int negative_sample(std::unordered_set<int>& existing,  std::uniform_int_distribution<>& sampler ); 
+int negative_sample(const std::unordered_set<size_t>& existing,  std::uniform_int_distribution<int>& sampler ); 
 
 /*
  * Compute the distance of two vector
  */
-
+double computeDist(int norm_flag, const std::vector<double>& vec1, const std::vector<double>& vec2);
 /*
  * Compute the graident of a norm
  */
@@ -34,7 +34,17 @@ double getDistanceGrad(int l_idx, double start, double end);
 /*
  * Normalize a vector
  */
-void normalize(vector<double>& vec);
+void normalize(std::vector<double>& vec);
+
+/*
+ * Reshape a matrix
+ */
+template <typename T>
+void reshape(std::vector<std::vector<T>>& mat, int row, int col){
+	mat.resize(row);
+	for(auto& each_row : mat)
+		each_row.resize(col);
+}
 
 /* 
  * Arithmetic operation for vector
@@ -67,3 +77,11 @@ std::vector<T> operator-(const std::vector<T>& a, const std::vector<T>& b)
     return result;
 }
 
+
+/*************************/
+/*    File processing    */
+/*************************/
+/*
+ * Count number of lines of a file
+ */
+size_t countLine(std::ifstream& ifs);
