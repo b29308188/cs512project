@@ -3,6 +3,9 @@
 
 void Train::readData(const std::string& relation_file_name, const std::string& entity_file_name, const std::string& network_file_name) {
   ifstream relation_file_handler, entity_file_handler, network_file_handler;
+  // read networks
+  network_file_handler.open(network_file_name, std::ifstream::in);
+  readNetwork(network_file_handler);
   // relation reading
   relation_file_handler.open(relation_file_name, std::ifstream::in);
   readWeights(relation_file_handler, relation_mat_, r_dimension_);
@@ -11,9 +14,6 @@ void Train::readData(const std::string& relation_file_name, const std::string& e
   entity_file_handler.open(entity_file_name, std::ifstream::in);
   readWeights(entity_file_handler, entity_mat_, e_dimension_);
   entity_file_handler.close();
-  // read networks
-  network_file_handler.open(network_file_name, std::ifstream::in);
-  readNetwork(network_file_handler);
 }
 
 void Train::readNetwork(ifstream& fileHandler) {

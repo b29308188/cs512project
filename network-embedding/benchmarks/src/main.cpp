@@ -12,7 +12,7 @@ int main(int argc,char**argv)
     cout<<"margin = "<<margin<<endl;
 
     Train trainer(n, n, rate, margin, sMethod);
-	trainer.readData("./initData/realtion.data", "./initData/entity.data", "./initData/network.data");
+	trainer.readData("./initData/realtionEmbedding.data", "./initData/entityEmbedding.data", "./initData/network.data");
     trainer.run();
     trainer.writeData("./finalEmbedding/relation.data", "/finalEmbedding/entity.data" );
 }
