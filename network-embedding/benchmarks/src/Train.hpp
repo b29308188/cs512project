@@ -1,6 +1,7 @@
 #pragma once
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -10,6 +11,7 @@
 #include <iomanip>
 #include <algorithm>
 #include <stdexcept>
+#include <exception>
 
 using namespace std;
 
