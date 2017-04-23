@@ -17,4 +17,4 @@ $(EXES): $(OBJS)
 	$(CC) $(CFLAGS) $< -o $@
 
 clean:
-	rm -rf $(OBJS) $(EXES)
+	rm -rf $(OBJS) $(EXES) Train
