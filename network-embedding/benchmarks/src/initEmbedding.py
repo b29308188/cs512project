@@ -38,6 +38,8 @@ class Embedder(object):
         # vectors
         self.relation_vec = []
         self.entity_vec = []
+        # network vec contains the (h,t,l) tuple. each element is id
+        self.network_vec = []
 
     def readIDData2ID(self, fileName, data2id, id2data):
         """
@@ -78,17 +80,23 @@ class Embedder(object):
                 arr = line.split()
                 head, tail, relation = arr[0], arr[1], arr[2]
                 if not head in self.entity2id:
-                    dataDict[head] = self.numEntities
+                    self.entity2id[head] = self.numEntities
+                    self.id2entity[self.numEntities] = head
                     self.numEntities += 1
+
                 if not tail in self.entity2id:
+                    self.entity2id[tail] = self.numEntities
+                    self.id2entity[self.numEntities] = tail
                     dataDict[tail] = self.numEntities
                     self.numEntities += 1
-                self.checkExistence(self.entity2id, head)
-                self.checkExistence(self.entity2id, tail)
 
                 if relation not in self.relation2id:
                     self.relation2id[relation] = self.numRelations
+                    self.id2relation[self.numRelations] = relation
                     self.numRelations += 1
+
+                headID, tailID, relationID = self.entity2id[head], self.entity2id[tail], self.relation2id[relation]
+                self.network_vec.append([headID, tailID, relationID])
     
     def readIDData(self):
         """
@@ -117,6 +125,20 @@ class Embedder(object):
             sizeTuple = (self.numEntities, self.eDimension)
             self.entityEmbeddings = np.random.uniform(eMin, eMax, sizeTuple)
 
+    def writeNetwork(self):
+        """
+        Write network data to a outputdir/network.data
+        """
+        networkFile = os.path.join(self.outputDir, 'network.data')
+        print('writing data to {} ...'.format(networkFile))
+
+        with open(networkFile, 'w') as fileHandler:
+            for vec in self.network_vec:
+                nextStr = ''
+                for element in vec:
+                    nextStr += '{} '.format(element)
+                print(nextStr, file=fileHandler)
+        self.network_vec = []
     def writeEmbedding(self):
         """
         Write the relation embeddings to outputdir/relationEmbedding.data
@@ -157,5 +179,6 @@ if __name__ == '__main__':
     embedder = Embedder(args.dataDir, args.outputDir, args.entityFile, args.relationFile, args.dimension, args.relationDimension)
     embedder.readData()
     embedder.generateEmbedding()
+    embedder.writeNetwork()
     embedder.writeEmbedding()
 

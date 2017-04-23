@@ -4,7 +4,7 @@ CPPFLAGS=-g -std=c++14
 CFLAGS=-c -std=c++14 -Wall
 
 
-SRCS=utils.cpp Train.cpp main.cpp
+SRCS=Train.cpp main.cpp
 OBJS=$(SRCS:.cpp=.o)
 EXES=Train
 

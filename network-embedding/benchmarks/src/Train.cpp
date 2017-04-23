@@ -1,7 +1,8 @@
 #include "Train.hpp"
+#include "utils.hpp"
 
-void Train::readData(const string& relation_file_name, const string& entity_file_name) {
-  ifstream relation_file_handler, entity_file_handler;
+void Train::readData(const std::string& relation_file_name, const std::string& entity_file_name, const std::string& network_file_name) {
+  ifstream relation_file_handler, entity_file_handler, network_file_handler;
   // relation reading
   relation_file_handler.open(relation_file_name, std::ifstream::in);
   readWeights(relation_file_handler, relation_mat_, r_dimension_);
@@ -10,6 +11,21 @@ void Train::readData(const string& relation_file_name, const string& entity_file
   entity_file_handler.open(entity_file_name, std::ifstream::in);
   readWeights(entity_file_handler, entity_mat_, e_dimension_);
   entity_file_handler.close();
+  // read networks
+  network_file_handler.open(network_file_name, std::ifstream::in);
+  readNetwork(network_file_handler);
+}
+
+void Train::readNetwork(ifstream& fileHandler) {
+	auto numLines = countLine(fileHandler);
+	triplets_.reserve(numLines);
+	std::string eachLine;
+	while(std::getline(fileHandler, eachLine)) {
+		std::istringstream inputStream(eachLine); 
+		size_t headID, tailID, relationID;
+		triplets_.emplace_back( std::make_tuple(headID, tailID, relationID));
+	}
+	cout << "length is " << triplets_.size() << endl;
 }
 
 void Train::readWeights(ifstream& fileHandler, std::vector<features_t>& dataMat, const size_t& dimension) {
@@ -37,7 +53,6 @@ void Train::run() {
 
   // for each epoch
   for ( size_t epoch_idx = 0; epoch_idx < num_epoch_; epoch_idx++ ){
-
     loss_= 0.0;
     // for each batch
     for ( size_t batch_idx = 0; batch_idx < num_batches_; batch_idx ++) {
@@ -59,7 +74,7 @@ void Train::batchUpdate(){
 
   auto batchsize = triplets_.size()/num_batches_;
 
-  for ( size_t idx; idx < batchsize; idx ++ ) {
+  for ( size_t idx = 0; idx < batchsize; idx ++ ) {
     // sample a triplet
     auto triplet_idx = triplet_sampler_(Utils::generator);
     // get the head and the tail
@@ -145,7 +160,7 @@ void Train::updateGradient(features_t& head_vec, features_t& tail_vec, features_
 }
 
 
-void Train::writeData() {
+void Train::writeData(const string& relation_file_name, const string& entity_file_name) {
   // open file for writing
   ofstream relation_file, entity_file;
   relation_file.open(relation_file_name, ios::out|ios::trunc);

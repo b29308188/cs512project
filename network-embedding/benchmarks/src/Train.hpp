@@ -1,5 +1,16 @@
 #pragma once
-#include "utils.hpp"
+#include <fstream>
+#include <iostream>
+#include <string>
+#include <vector>
+#include <unordered_map>
+#include <unordered_set>
+#include <tuple>
+#include <random>
+#include <iomanip>
+#include <algorithm>
+#include <stdexcept>
+
 using namespace std;
 
 
@@ -21,7 +32,7 @@ public:
   /*
    * Read pre-processed data
    */
-  void readData(const string& relation_file_name, const string& entity_file_name);
+  void readData(const string& relation_file_name, const string& entity_file_name, const string& network_file_name);
 
   /*
    * Traverse all relationship and update   
@@ -31,13 +42,15 @@ public:
   /*
    * Write to file
    */
-  void writeData();
+  void writeData(const string& relation_file, const string& entity_file);
 /*
  * private functions
  */
 private:
   // read weight vectors from a given file
   void readWeights(ifstream& ifs, std::vector<features_t>& dataMat, const size_t& dimension);
+  // read network data
+  void readNetwork(ifstream& ifs);
   // update a mini batch
   void batchUpdate();
   // update weight
@@ -71,7 +84,6 @@ private:
   uniform_int_distribution<int> triplet_sampler_;
 
   double loss_ = 0.0;
-
   int norm_flag_ = 2;
 
   using uset_t = unordered_set<size_t>;
