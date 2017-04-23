@@ -5,13 +5,19 @@ void Train::readData(const std::string& relation_file_name, const std::string& e
   ifstream relation_file_handler, entity_file_handler, network_file_handler;
   // read networks
   network_file_handler.open(network_file_name, std::ifstream::in);
+  if (!network_file_handler.good())
+    throw runtime_error("file doesnt exist");
   readNetwork(network_file_handler);
   // relation reading
   relation_file_handler.open(relation_file_name, std::ifstream::in);
+  if (!relation_file_handler.good())
+    throw runtime_error("file doesnt exist");
   readWeights(relation_file_handler, relation_mat_, r_dimension_);
   relation_file_handler.close();
   // entity reading
   entity_file_handler.open(entity_file_name, std::ifstream::in);
+  if (!entity_file_handler.good())
+    throw runtime_error("file doesnt exist");
   readWeights(entity_file_handler, entity_mat_, e_dimension_);
   entity_file_handler.close();
 }
