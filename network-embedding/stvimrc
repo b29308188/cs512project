@@ -39,7 +39,6 @@
  set number
  " highlight matching braces
  set showmatch
- set showmatch
  " intelligent comments
  set comments=sl:/*,mb:\ *,elx:\ */
  " highlight current line
