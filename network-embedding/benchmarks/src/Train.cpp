@@ -2,23 +2,28 @@
 #include "utils.hpp"
 
 void Train::readData(const std::string& relation_file_name, const std::string& entity_file_name, const std::string& network_file_name) {
-  ifstream relation_file_handler, entity_file_handler, network_file_handler;
+
+  ifstream relation_file_handler(network_file_name);
+  ifstream entity_file_handler(entity_file_name);
+  ifstream network_file_handler(network_file_name);
   // read networks
-  network_file_handler.open(network_file_name, std::ifstream::in);
-  if (!network_file_handler.good())
+  if (!network_file_handler)
     throw runtime_error("file doesnt exist");
+  cout << "reding networks ... " << endl;
   readNetwork(network_file_handler);
   // relation reading
-  relation_file_handler.open(relation_file_name, std::ifstream::in);
-  if (!relation_file_handler.good())
+  if (!relation_file_handler)
     throw runtime_error("file doesnt exist");
+  cout << "reding weights from " << relation_file_name << " ... " << endl;
   readWeights(relation_file_handler, relation_mat_, r_dimension_);
+  cout << "relation mat " << relation_mat_.size() << " " << relation_mat_[0].size() <<endl;
   relation_file_handler.close();
   // entity reading
-  entity_file_handler.open(entity_file_name, std::ifstream::in);
-  if (!entity_file_handler.good())
+  if (!entity_file_handler)
     throw runtime_error("file doesnt exist");
+  cout << "reding weights from " << entity_file_name << " ... " << endl;
   readWeights(entity_file_handler, entity_mat_, e_dimension_);
+  cout << "entity mat " << entity_mat_.size() << " " << relation_mat_[0].size() <<endl;
   entity_file_handler.close();
 }
 
@@ -31,7 +36,6 @@ void Train::readNetwork(ifstream& fileHandler) {
 		size_t headID, tailID, relationID;
 		triplets_.emplace_back( std::make_tuple(headID, tailID, relationID));
 	}
-	cout << "length is " << triplets_.size() << endl;
 }
 
 void Train::readWeights(ifstream& fileHandler, std::vector<features_t>& dataMat, const size_t& dimension) {
@@ -52,8 +56,8 @@ void Train::readWeights(ifstream& fileHandler, std::vector<features_t>& dataMat,
 
 void Train::run() {
   // prepare random device
-  entity_sampler_ = uniform_int_distribution<>(0, entity_mat_.size());
-  triplet_sampler_ = uniform_int_distribution<>(0, triplets_.size());
+  entity_sampler_ = uniform_int_distribution<>(0, entity_mat_.size()-1);
+  triplet_sampler_ = uniform_int_distribution<>(0, triplets_.size()-1);
 
   loss_= 0.0;
 
@@ -109,6 +113,7 @@ void Train::batchUpdate(){
 }
 
 
+char sp = ' ';
 void Train::weightUpdate(size_t head_id, size_t tail_id, size_t relation_id, 
                   size_t comp_head_id, size_t comp_tail_id, size_t comp_relation_id) {
   auto& head_vec = entity_mat_[head_id];
@@ -117,7 +122,12 @@ void Train::weightUpdate(size_t head_id, size_t tail_id, size_t relation_id,
 
   auto& comp_head = entity_mat_[comp_head_id];
   auto& comp_tail = entity_mat_[comp_tail_id];
-  auto& comp_relation = relation_mat_[comp_head_id];
+  auto& comp_relation = relation_mat_[comp_relation_id];
+
+  if(head_vec.size()*tail_vec.size()*relation_vec.size() == 0)
+    throw std::runtime_error("incorrect dimension");
+  if(comp_head.size()*comp_tail.size()*comp_relation.size() == 0)
+    throw std::runtime_error("incorrect dimension");
 
   auto sum1 = computeDist( norm_flag_, tail_vec, head_vec + relation_vec);
   auto sum2 = computeDist( norm_flag_, comp_tail, comp_head + comp_relation);
