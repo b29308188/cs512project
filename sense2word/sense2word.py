@@ -38,7 +38,8 @@ def make_word_embeddings(senseE, lexicon, method = "averaged"):
             continue
         if method == "averaged":
             for sense in synsets:
-                v += senseE[sense.name()]
+                if sense.name() in senseE:
+                    v += senseE[sense.name()]
             v /= len(synsets) 
         elif method == "expected":
             total = 0.0
@@ -48,10 +49,12 @@ def make_word_embeddings(senseE, lexicon, method = "averaged"):
                 total += cnt
             v /= total
         wordE[word] = v
+        if max(v) == 0:
+            del wordE[word]
     return wordE
 
 if __name__ == "__main__":
-    senseE = read_sense_embeddings("./try.txt")
+    senseE = read_sense_embeddings("./e.small")
     lexicon = read_lexicon()
     wordE = make_word_embeddings(senseE, lexicon)
-    write_word_embeddings("./wordE.txt", wordE)
+    write_word_embeddings("./smallE.txt", wordE)

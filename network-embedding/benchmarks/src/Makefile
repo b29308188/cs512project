@@ -1,7 +1,7 @@
 CC=g++
-LDFLAGS=-g -std=c++14
-CPPFLAGS=-g -std=c++14
-CFLAGS=-g -c -std=c++14 -Wall
+LDFLAGS=-o3 -std=c++14 
+CPPFLAGS=-o3 -std=c++14
+CFLAGS=-o3 -c -std=c++14 -Wall
 
 
 SRCS=Train.cpp main.cpp

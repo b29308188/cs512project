@@ -34,6 +34,7 @@ void Train::readNetwork(ifstream& fileHandler) {
 	while(std::getline(fileHandler, eachLine)) {
 		std::istringstream inputStream(eachLine); 
 		size_t headID, tailID, relationID;
+		inputStream >> headID >> tailID >> relationID;
 		triplets_.emplace_back( std::make_tuple(headID, tailID, relationID));
 	}
 }
@@ -55,6 +56,7 @@ void Train::readWeights(ifstream& fileHandler, std::vector<features_t>& dataMat,
 }
 
 void Train::run() {
+cout << "runnigne ... " <<endl;
   // prepare random device
   entity_sampler_ = uniform_int_distribution<>(0, entity_mat_.size()-1);
   triplet_sampler_ = uniform_int_distribution<>(0, triplets_.size()-1);
@@ -124,10 +126,14 @@ void Train::weightUpdate(size_t head_id, size_t tail_id, size_t relation_id,
   auto& comp_tail = entity_mat_[comp_tail_id];
   auto& comp_relation = relation_mat_[comp_relation_id];
 
-  if(head_vec.size()*tail_vec.size()*relation_vec.size() == 0)
+  if(head_vec.size()*tail_vec.size()*relation_vec.size() == 0) {
+	  cerr << "incorrect dimension" <<endl;
     throw std::runtime_error("incorrect dimension");
-  if(comp_head.size()*comp_tail.size()*comp_relation.size() == 0)
+  }
+  if(comp_head.size()*comp_tail.size()*comp_relation.size() == 0) {
+	  cerr << "incorrect dimension" <<endl;
     throw std::runtime_error("incorrect dimension");
+  }
 
   auto sum1 = computeDist( norm_flag_, tail_vec, head_vec + relation_vec);
   auto sum2 = computeDist( norm_flag_, comp_tail, comp_head + comp_relation);

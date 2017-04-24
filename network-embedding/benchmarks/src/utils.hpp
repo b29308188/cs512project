@@ -33,8 +33,10 @@ void reshape(std::vector<std::vector<T>>& mat, int row, int col){
 template <typename T>
 std::vector<T> operator+(const std::vector<T>& a, const std::vector<T>& b)
 {
-    if(a.size() != b.size())
+    if(a.size() != b.size()) {
+		cerr << "size doesnt match " << endl;
       throw std::domain_error("adding vectors with different dimensions");
+	}
 
     std::vector<T> result;
     result.reserve(a.size());
@@ -47,8 +49,10 @@ std::vector<T> operator+(const std::vector<T>& a, const std::vector<T>& b)
 template <typename T>
 std::vector<T> operator-(const std::vector<T>& a, const std::vector<T>& b)
 {
-    if(a.size() != b.size())
+    if(a.size() != b.size()){
+		cerr << "size doesnt match " << endl;
       throw std::domain_error("subtracting vectors with different dimensions");
+	}
 
     std::vector<T> result;
     result.reserve(a.size());

@@ -1,3 +1,8 @@
+*.zip
+*.bern
+*.vec
+*.txt
+Train
 data
 initData
 *data
