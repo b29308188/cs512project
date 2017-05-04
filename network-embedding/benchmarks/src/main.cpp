@@ -8,6 +8,10 @@ void checkAllFiles(std::vector<std::string> arr);
 
 int main(int argc,char**argv)
 {
+	if (argc < 3) {
+		std::cerr << "usage: ./Train [inputDir] [outputDir]" << std::endl;
+	}
+	std::cout << "start training embedding ..." << std::endl;
 	std::string inputDir = argv[1];
 	std::string outputDir = argv[2];
 	
@@ -18,7 +22,7 @@ int main(int argc,char**argv)
 	std::string outputRelationFile = outputDir + "/relation.data";
 	std::string outputEntityFile = outputDir + "/entity.data";
 
-	checkAllFiles( {inputRelationFile, inputEntityFile, networkFile, outputRelationFile, outputEntityFile } );
+	checkAllFiles( {inputRelationFile, inputEntityFile, networkFile} );
 
 	SamplingMethod sMethod = SamplingMethod::UniformDistribution;
     int n = 300;

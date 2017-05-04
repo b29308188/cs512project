@@ -1,8 +1,19 @@
 #include "Train.hpp"
 #include "utils.hpp"
+#include <cmath>
+
+void containsNaN(vector<vector<vector<double>>> tocheck) {
+	for (auto& eachMat : tocheck)
+		for (auto& eachvec : eachMat)
+			for(auto& elem : eachvec)
+				if (isnan(elem) || isinf(elem)) {
+					cout << "Element is nan " << endl;
+					abort();
+				}
+}
 
 void Train::readData(const std::string& relation_file_name, const std::string& entity_file_name, const std::string& network_file_name) {
-
+  cout << "start reading networks" << endl;
   ifstream relation_file_handler(network_file_name);
   ifstream entity_file_handler(entity_file_name);
   ifstream network_file_handler(network_file_name);
@@ -16,14 +27,14 @@ void Train::readData(const std::string& relation_file_name, const std::string& e
     throw runtime_error("file doesnt exist");
   cout << "reding weights from " << relation_file_name << " ... " << endl;
   readWeights(relation_file_handler, relation_mat_, r_dimension_);
-  cout << "relation mat " << relation_mat_.size() << " " << relation_mat_[0].size() <<endl;
+  cout << "relation data size: " << relation_mat_.size() << " x " << relation_mat_[0].size() <<endl;
   relation_file_handler.close();
   // entity reading
   if (!entity_file_handler)
     throw runtime_error("file doesnt exist");
   cout << "reding weights from " << entity_file_name << " ... " << endl;
   readWeights(entity_file_handler, entity_mat_, e_dimension_);
-  cout << "entity mat " << entity_mat_.size() << " " << relation_mat_[0].size() <<endl;
+  cout << "entity data size: " << entity_mat_.size() << " x " << relation_mat_[0].size() <<endl;
   entity_file_handler.close();
 }
 
@@ -56,13 +67,12 @@ void Train::readWeights(ifstream& fileHandler, std::vector<features_t>& dataMat,
 }
 
 void Train::run() {
-cout << "runnigne ... " <<endl;
+  cout << "running ... " <<endl;
   // prepare random device
   entity_sampler_ = uniform_int_distribution<>(0, entity_mat_.size()-1);
   triplet_sampler_ = uniform_int_distribution<>(0, triplets_.size()-1);
 
   loss_= 0.0;
-
   // for each epoch
   for ( size_t epoch_idx = 0; epoch_idx < num_epoch_; epoch_idx++ ){
     loss_= 0.0;
@@ -72,12 +82,13 @@ cout << "runnigne ... " <<endl;
       relation_tmp_ = relation_mat_;
       entity_tmp_ = entity_mat_;
       batchUpdate();
+	  relation_mat_ = relation_tmp_;
+	  entity_mat_ = entity_tmp_;
     } //end for each batch 
     // update the embedding after each batch update
-    relation_mat_ = relation_tmp_;
-    entity_mat_ = entity_tmp_;
 
-    cout << "Epoch: " << epoch_idx << " " << loss_<< endl;
+    cout << "epoch: " << epoch_idx << " loss: " << loss_<< endl;
+	writeSnapshot();
   } // end for each epoch
 }
 
@@ -122,9 +133,17 @@ void Train::weightUpdate(size_t head_id, size_t tail_id, size_t relation_id,
   auto& tail_vec = entity_mat_[tail_id];
   auto& relation_vec = relation_mat_[relation_id];
 
+  auto& head_tmp = entity_tmp_[head_id];
+  auto& tail_tmp = entity_tmp_[tail_id];
+  auto& relation_tmp = relation_tmp_[relation_id];
+
   auto& comp_head = entity_mat_[comp_head_id];
   auto& comp_tail = entity_mat_[comp_tail_id];
   auto& comp_relation = relation_mat_[comp_relation_id];
+
+  auto& comp_head_tmp = entity_tmp_[comp_head_id];
+  auto& comp_tail_tmp = entity_tmp_[comp_tail_id];
+  auto& comp_relation_tmp = relation_tmp_[comp_relation_id];
 
   if(head_vec.size()*tail_vec.size()*relation_vec.size() == 0) {
 	  cerr << "incorrect dimension" <<endl;
@@ -141,58 +160,92 @@ void Train::weightUpdate(size_t head_id, size_t tail_id, size_t relation_id,
   // if too far, compute gradient and do update 
   if ( sum1 + margin_ > sum2) {
     loss_+= margin_ + sum1 - sum2;
-    updateGradient( head_vec, tail_vec, relation_vec);
-    updateGradient( comp_head, comp_tail, comp_relation);
+    updateGradient( head_vec, tail_vec, relation_vec, head_tmp, tail_tmp, relation_tmp);
+    updateGradient( comp_head, comp_tail, comp_relation, comp_head_tmp, comp_tail_tmp, comp_relation_tmp);
   }
 }
 
-void Train::updateGradient(features_t& head_vec, features_t& tail_vec, features_t& relation_vec) {
-	// First, compute difference
-	auto gradVec = tail_vec - ( head_vec + relation_vec);
-	// Transform from difference to gradient
-	std::transform(gradVec.begin(), gradVec.end(), gradVec.begin(), 
-			[this] (double& val) {
-				if(norm_flag_ == 1)
-					return (val>0) ? 1.0:-1.0;
-				else
-					return 2*val;
+void Train::updateGradient(features_t& head_vec, features_t& tail_vec, features_t& relation_vec, features_t& head_tmp, features_t& tail_tmp, features_t& relation_tmp) {
+	for ( size_t i = 0 ; i < head_vec.size(); i++ ) {
+		double x = 2*(tail_vec[i] - head_vec[i] - relation_vec[i]);
+		if ( x > 0)
+			x = 1;
+		else
+			x = -1;
+		
+		relation_tmp[i] -= -1*learning_rate_*x;
+		head_tmp[i] -= -1*learning_rate_*x;
+		tail_tmp[i] += -1*learning_rate_*x;
+		if( isnan(relation_tmp[i]) || isinf(relation_tmp[i]) ){
+			cout << "NaN appears " << learning_rate_ << " " << x << endl;
+			abort();
 			}
-			);	
-
-	// Do update on each std::vector
-	// For each element, minus gradient
-	auto minusFunc = [this](double& grad, double& elem) {
-		auto update = -1*grad*learning_rate_;
-		return elem - update;
-	};
-	// For each element, plus graident
-	auto plusFunc = [this](double& grad, double& elem) {
-		auto update = -1*grad*learning_rate_;
-		return elem + update;
-	};
-
-	std::transform(gradVec.begin(), gradVec.end(), 
-				relation_vec.begin(), relation_vec.begin(), minusFunc);
-
-	std::transform(gradVec.begin(), gradVec.end(), 
-				head_vec.begin(), head_vec.begin(), minusFunc);
-
-	std::transform(gradVec.begin(), gradVec.end(),
-			tail_vec.begin(), tail_vec.begin(), plusFunc);
+		if( isnan(head_tmp[i]) || isinf(head_tmp[i]) ){
+			cout << "NaN appears " << learning_rate_ << " " << x << endl;
+			abort();
+			}
+		if( isnan(tail_tmp[i]) || isinf(tail_tmp[i]) ){
+			cout << "NaN appears " << learning_rate_ << " " << x << endl;
+			abort();
+			}
+	}
 }
 
+//void backup(features_t& head_vec, features_t& tail_vec, features_t& relation_vec) {
+//
+//	// First, compute difference
+//	auto gradVec = tail_vec - ( head_vec + relation_vec);
+//	// Transform from difference to gradient
+//	std::transform(gradVec.begin(), gradVec.end(), gradVec.begin(), 
+//			[this] (double& val) {
+//				if(norm_flag_ == 1)
+//					return (val>0) ? 1.0:-1.0;
+//				else
+//					return 2*val;
+//			}
+//			);	
+//
+//	// Do update on each std::vector
+//	// For each element, minus gradient
+//	auto minusFunc = [this](double& grad, double& elem) {
+//		auto update = -1*grad*learning_rate_;
+//		return elem - update;
+//	};
+//	// For each element, plus graident
+//	auto plusFunc = [this](double& grad, double& elem) {
+//		auto update = -1*grad*learning_rate_;
+//		return elem + update;
+//	};
+//
+//	std::transform(gradVec.begin(), gradVec.end(), 
+//				relation_vec.begin(), relation_vec.begin(), minusFunc);
+//
+//	std::transform(gradVec.begin(), gradVec.end(), 
+//				head_vec.begin(), head_vec.begin(), minusFunc);
+//
+//	std::transform(gradVec.begin(), gradVec.end(),
+//			tail_vec.begin(), tail_vec.begin(), plusFunc);
+//}
 
+void Train::writeSnapshot() {
+	relation_file_name = "relation-snap-shot.data";
+	entity_file_name = "entity_snap-shot.data";
+	writeData(relation_file_name, entity_file_name);
+}
 void Train::writeData(const string& relation_file_name, const string& entity_file_name) {
+  std::cout << "writing data ... " << std::endl;
   // open file for writing
   ofstream relation_file, entity_file;
   relation_file.open(relation_file_name, ios::out|ios::trunc);
   entity_file.open(relation_file_name, ios::out|ios::trunc);
+  std::cout << "writing relation to " << relation_file_name << std::endl;
   // print out each relation std::vector
   for( auto relation_vec : relation_mat_) {
     for ( auto element : relation_vec)
       relation_file << setprecision(7) << element << '\t' ;
     relation_file << endl;
   }
+  std::cout << "writing entity to " << entity_file_name << std::endl;
   // print out each entity std::vector
   for ( auto entity_vec : entity_mat_ ) {
     for ( auto element : entity_vec) 
