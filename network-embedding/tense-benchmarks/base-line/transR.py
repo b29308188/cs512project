@@ -5,7 +5,7 @@ import os
 import time
 import datetime
 import ctypes
-from uilts import writeEmbedding
+from utils import writeEmbedding
 
 ll = ctypes.cdll.LoadLibrary   
 lib = ll("./init.so")
@@ -132,10 +132,18 @@ class TransRModel(object):
             self.loss = self.lossR + self.lossL
 
 
-def main(_):
+def main(args):
+    
+    inputDir = args[1]
+    
+    relationFile = os.path.join(inputDir, 'relation2id.txt')
+    entityFile = os.path.join(inputDir, 'entity2id.txt')
+    tripleFile = os.path.join(inputDir, 'triple2id.txt')
 
-    lib.init()
-    config = Config()
+    checkExistenceExit(relationFile, entityFile, tripleFile)
+
+    lib.init(relationFile, entityFile, tripleFile)
+    config = Config(inputDir)
     config.relation = lib.getRelationTotal()
     config.entity = lib.getEntityTotal()
     config.batch_size = lib.getTripleTotal() / config.nbatches

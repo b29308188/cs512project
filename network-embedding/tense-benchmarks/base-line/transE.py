@@ -6,7 +6,7 @@ import os, signal
 import time
 import datetime
 import ctypes
-from utils import writeEmbedding
+from utils import *
 import argparse
 
 ll = ctypes.cdll.LoadLibrary   
@@ -30,7 +30,8 @@ def handler(signum, frame):
 
 class Config(object):
 
-    def __init__(self):
+    def __init__(self, inputDir):
+        self.inputDir = inputDir 
         self.L1_flag = True
         self.hidden_size = 300
         self.nbatches = 100
@@ -44,7 +45,7 @@ class Config(object):
         self.glove_initializer = None
 
     def readEmbeddings(self):
-        fileName = './data/initSenseEmbedding.txt'
+        fileName = os.path.join(self.inputDir, 'initSenseEmbedding.txt')
         if not os.path.exists(fileName):
             print('{} does not exist'.format(fileName))
             exit(2)
@@ -132,9 +133,18 @@ class TransEModel(object):
                 self.lossR = config.reg_rate*(self.total_reg_loss)
                 self.loss += self.lossR
 
-def main(_):
-    lib.init()
-    config = Config()
+def main(args):
+    
+    inputDir = args[1]
+    
+    relationFile = os.path.join(inputDir, 'relation2id.txt')
+    entityFile = os.path.join(inputDir, 'entity2id.txt')
+    tripleFile = os.path.join(inputDir, 'triple2id.txt')
+
+    checkExistenceExit(relationFile, entityFile, tripleFile)
+
+    lib.init(relationFile, entityFile, tripleFile)
+    config = Config(inputDir)
     config.relation = lib.getRelationTotal()
     config.entity = lib.getEntityTotal()
     config.batch_size = lib.getTripleTotal() / config.nbatches
@@ -212,7 +222,7 @@ def main(_):
                 if initRes is None:
                     initRes = res
                 print('epoch: {} loss: {} percentage:{:.3f}%'.format(times, res, res/initRes*100))
-                print('lossL: {} ({:.3f}%) lossR: {} ({:.3f}%'.format(lossL_t, lossL_t/rees, lossR_t, lossR_t/res))
+                print('lossL: {} ({:.3f}%) lossR: {} ({:.3f}%'.format(lossL_t, lossL_t/res, lossR_t, lossR_t/res))
 
                 snapshot = trainModel.ent_embeddings.eval()
                 sensesnapshot = trainModel.sense_embeddings.eval()
@@ -223,7 +233,6 @@ def main(_):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
     if not os.path.exists(outputDir):
         os.mkdir(outputDir)
     tf.app.run()

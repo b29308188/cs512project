@@ -73,9 +73,18 @@ class TransHModel(object):
 		with tf.name_scope("output"):
 			self.loss = tf.reduce_sum(tf.maximum(pos - neg + margin, 0))
 
-def main(_):
-	lib.init()
-	config = Config()
+def main(args):
+    
+    inputDir = args[1]
+    
+    relationFile = os.path.join(inputDir, 'relation2id.txt')
+    entityFile = os.path.join(inputDir, 'entity2id.txt')
+    tripleFile = os.path.join(inputDir, 'triple2id.txt')
+
+    checkExistenceExit(relationFile, entityFile, tripleFile)
+
+    lib.init(relationFile, entityFile, tripleFile)
+	config = Config(inputDir)
 	config.relation = lib.getRelationTotal()
 	config.entity = lib.getEntityTotal()
 	config.batch_size = lib.getTripleTotal() / config.nbatches
