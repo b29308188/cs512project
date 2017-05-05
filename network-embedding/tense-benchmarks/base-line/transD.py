@@ -15,7 +15,6 @@ outputDir = 'transD-regularization-results'
 embeddingFileName = '{}/reg-{}'.format(outputDir, deg)
 modelFileName = '{}/model.vec-adam-{}'.format(outputDir, deg)
 
-
 class Config(object):
     def __init__(self):
         self.L1_flag = True
@@ -28,6 +27,7 @@ class Config(object):
         self.reg_rate = 10**(-deg)
         self.learning_rate = 0.001
         self.glove_initializer = None
+        self.enable_sense = False
 
     def readEmbeddings(self):
         fileName = './data/initSenseEmbedding.txt'
@@ -52,7 +52,15 @@ class Config(object):
 class TransDModel(object):
 
 	def calc(self, e, t, r):
-		return e + tf.reduce_sum(e * t, 1, keep_dims = True) * r
+            return e + tf.reduce_sum(e * t, 1, keep_dims = True) * r
+
+        def compute_regularization(self, entity, sense_embedding, glove_word):
+            predict_word = entity
+            if self.config.enable_sense:
+                predict_word = tf.multiply(entity, sense_embedding)
+            difference = predict_word - glove_word
+            reg_loss = difference**2
+            return tf.reduce_sum(reg_loss)
 
 	def __init__(self, config):
 
@@ -61,8 +69,10 @@ class TransDModel(object):
             batch_size = config.batch_size
             size = config.hidden_size
             margin = config.margin
+            self.config = config
 
             self.glove_data = tf.get_variable(name='glove_embedding', shape = [entity_total, size], trainable=False, initializer = config.glove_initializer)
+            self.sense_embedding = tf.get_variable(name='sense_embedding', shape = [entity_total, size], initializer = tf.ones_initializer())
 
             self.pos_h = tf.placeholder(tf.int32, [None])
             self.pos_t = tf.placeholder(tf.int32, [None])
@@ -78,26 +88,37 @@ class TransDModel(object):
                 self.ent_transfer = tf.get_variable(name = "ent_transfer", shape = [entity_total, size], initializer = tf.contrib.layers.xavier_initializer(uniform = False))
                 self.rel_transfer = tf.get_variable(name = "rel_transfer", shape = [relation_total, size], initializer = tf.contrib.layers.xavier_initializer(uniform = False))
 
-                pos_h_e = tf.nn.embedding_lookup(self.ent_embeddings, self.pos_h)
-                pos_t_e = tf.nn.embedding_lookup(self.ent_embeddings, self.pos_t)
-                pos_r_e = tf.nn.embedding_lookup(self.rel_embeddings, self.pos_r)
+                # the real meaning of the entity
+                ent_pos_h_e = tf.nn.embedding_lookup(self.ent_embeddings, self.pos_h)
+                ent_pos_t_e = tf.nn.embedding_lookup(self.ent_embeddings, self.pos_t)
+                ent_pos_r_e = tf.nn.embedding_lookup(self.rel_embeddings, self.pos_r)
+                # the vector for projection
                 pos_h_t = tf.nn.embedding_lookup(self.ent_transfer, self.pos_h)
                 pos_t_t = tf.nn.embedding_lookup(self.ent_transfer, self.pos_t)
                 pos_r_t = tf.nn.embedding_lookup(self.rel_transfer, self.pos_r)
 
-                neg_h_e = tf.nn.embedding_lookup(self.ent_embeddings, self.neg_h)
-                neg_t_e = tf.nn.embedding_lookup(self.ent_embeddings, self.neg_t)
-                neg_r_e = tf.nn.embedding_lookup(self.rel_embeddings, self.neg_r)
+                # the real meaning of the entity
+                ent_neg_h_e = tf.nn.embedding_lookup(self.ent_embeddings, self.neg_h)
+                ent_neg_t_e = tf.nn.embedding_lookup(self.ent_embeddings, self.neg_t)
+                ent_neg_r_e = tf.nn.embedding_lookup(self.rel_embeddings, self.neg_r)
+                # the vector for projection
                 neg_h_t = tf.nn.embedding_lookup(self.ent_transfer, self.neg_h)
                 neg_t_t = tf.nn.embedding_lookup(self.ent_transfer, self.neg_t)
                 neg_r_t = tf.nn.embedding_lookup(self.rel_transfer, self.neg_r)
 
-                pos_h_e = self.calc(pos_h_e, pos_h_t, pos_r_t)
-                pos_t_e = self.calc(pos_t_e, pos_t_t, pos_r_t)
-                neg_h_e = self.calc(neg_h_e, neg_h_t, neg_r_t)
-                neg_t_e = self.calc(neg_t_e, neg_t_t, neg_r_t)
+                pos_h_e = self.calc(ent_pos_h_e, pos_h_t, pos_r_t)
+                pos_t_e = self.calc(ent_pos_t_e, pos_t_t, pos_r_t)
+                neg_h_e = self.calc(ent_neg_h_e, neg_h_t, neg_r_t)
+                neg_t_e = self.calc(ent_neg_t_e, neg_t_t, neg_r_t)
 
             with tf.name_scope('regularization'):
+
+                pos_sense_h_e = tf.nn.embedding_lookup(self.sense_embedding, self.pos_h) 
+                pos_sense_t_e = tf.nn.embedding_lookup(self.sense_embedding, self.pos_t) 
+
+                neg_sense_h_e = tf.nn.embedding_lookup(self.sense_embedding, self.neg_h) 
+                neg_sense_t_e = tf.nn.embedding_lookup(self.sense_embedding, self.neg_t) 
+
                 reg_pos_glove_h_e = tf.nn.embedding_lookup(self.glove_data, self.pos_h)
                 reg_pos_glove_t_e = tf.nn.embedding_lookup(self.glove_data, self.pos_t) 
 
@@ -105,23 +126,23 @@ class TransDModel(object):
                 reg_neg_glove_t_e = tf.nn.embedding_lookup(self.glove_data, self.neg_t)
 
             if config.L1_flag:
-                pos = tf.reduce_sum(abs(pos_h_e + pos_r_e - pos_t_e), 1, keep_dims = True)
-                neg = tf.reduce_sum(abs(neg_h_e + neg_r_e - neg_t_e), 1, keep_dims = True)
+                pos = tf.reduce_sum(abs(pos_h_e + ent_pos_r_e - pos_t_e), 1, keep_dims = True)
+                neg = tf.reduce_sum(abs(neg_h_e + ent_neg_r_e - neg_t_e), 1, keep_dims = True)
             else:
-                pos = tf.reduce_sum((pos_h_e + pos_r_e - pos_t_e) ** 2, 1, keep_dims = True)
-                neg = tf.reduce_sum((neg_h_e + neg_r_e - neg_t_e) ** 2, 1, keep_dims = True)			
+                pos = tf.reduce_sum((pos_h_e + ent_pos_r_e - pos_t_e) ** 2, 1, keep_dims = True)
+                neg = tf.reduce_sum((neg_h_e + ent_neg_r_e - neg_t_e) ** 2, 1, keep_dims = True)			
 
-            reg_loss_pos_h = (reg_pos_glove_h_e - pos_h_e)*(reg_pos_glove_h_e - pos_h_e)
-            reg_loss_pos_t = (reg_pos_glove_t_e - pos_t_e)*(reg_pos_glove_t_e - pos_t_e)
-            reg_loss_neg_h = (reg_neg_glove_h_e - neg_h_e)*(reg_neg_glove_h_e - neg_h_e)
-            reg_loss_neg_t = (reg_neg_glove_t_e - neg_t_e)*(reg_neg_glove_t_e - neg_t_e)
+            reg_loss_pos_h = self.compute_regularization(ent_pos_h_e, pos_sense_h_e, reg_pos_glove_h_e)
+            reg_loss_pos_t = self.compute_regularization(ent_pos_t_e, pos_sense_t_e, reg_pos_glove_t_e)
+            reg_loss_neg_h = self.compute_regularization(ent_neg_h_e, neg_sense_h_e, reg_neg_glove_h_e)
+            reg_loss_neg_t = self.compute_regularization(ent_neg_t_e, neg_sense_t_e, reg_neg_glove_t_e)
 
-            reg_loss = tf.reduce_sum(reg_loss_pos_h) + tf.reduce_sum(reg_loss_pos_t) + tf.reduce_sum(reg_loss_neg_h) + tf.reduce_sum(reg_loss_neg_t)
+            reg_loss = reg_loss_pos_h + reg_loss_pos_t + reg_loss_neg_h + reg_loss_neg_t
 
             with tf.name_scope("output"):
                 self.lossR = config.reg_rate*(reg_loss)
                 self.lossL = tf.reduce_sum(tf.maximum(pos - neg + margin, 0))
-                self.loss = self.lossL
+                self.loss = self.lossL+self.lossR
 
 def main(args):
     
@@ -148,7 +169,7 @@ def main(args):
                 trainModel = TransDModel(config = config)
 
             global_step = tf.Variable(0, name="global_step", trainable=False)
-            optimizer = tf.train.GradientDescentOptimizer(0.001)
+            optimizer = tf.train.AdamOptimizer()
             grads_and_vars = optimizer.compute_gradients(trainModel.loss)
             train_op = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
             saver = tf.train.Saver()
@@ -163,9 +184,9 @@ def main(args):
                         trainModel.neg_t: neg_t_batch,
                         trainModel.neg_r: neg_r_batch
                 }
-                _, step, loss, lossL = sess.run(
-                        [train_op, global_step, trainModel.loss, trainModel.lossL], feed_dict)
-                return loss, lossL
+                _, step, loss, lossL, lossR = sess.run(
+                        [train_op, global_step, trainModel.loss, trainModel.lossL, trainModel.lossR], feed_dict)
+                return loss, lossL, lossR
 
             ph = np.zeros(config.batch_size, dtype = np.int32)
             pt = np.zeros(config.batch_size, dtype = np.int32)
@@ -184,15 +205,18 @@ def main(args):
             initRes, initL, initR = None, None, None
             for times in range(config.trainTimes):
                 res, lossL_t = 0.0, 0.0
+                lossR_t = 0.0
                 for batch in range(config.nbatches):
                     lib.getBatch(ph_addr, pt_addr, pr_addr, nh_addr, nt_addr, nr_addr, config.batch_size)
-                    loss, lossL = train_step(ph, pt, pr, nh, nt, nr)
-                    res, lossL_t = res + loss, lossL_t + lossL
+                    loss, lossL, lossR = train_step(ph, pt, pr, nh, nt, nr)
+                    res, lossL_t, lossR_t = res + loss, lossL_t + lossL, lossR_t + lossR
 
                     current_step = tf.train.global_step(sess, global_step)
                 if initRes is None:
                     initRes, initL = res, lossL_t
-                print('epoch: {} loss:{:.3f} percentage:{:.3f}'.format(times, res, res/initRes))
+                    initR = lossR_t
+                print('epoch: {} loss:{:.3f} percentage:{:.3f}%'.format(times, res, res/initRes*100))
+                print('lossL: {:.3f}({:.3f}%) lossR: {:.3f}({:.3f}%)'.format(lossL_t, lossL_t/res*100,lossR_t, lossR_t/res*100))
 
                 snapshot = trainModel.ent_embeddings.eval()
                 if times%50 == 0:
