@@ -11,7 +11,7 @@ ll = ctypes.cdll.LoadLibrary
 lib = ll("./init.so")
 
 deg = 2
-outputDir = 'transD-regularization'
+outputDir = 'transD-regularization-results'
 embeddingFileName = '{}/reg-{}'.format(outputDir, deg)
 modelFileName = '{}/model.vec-adam-{}'.format(outputDir, deg)
 
@@ -30,18 +30,21 @@ class Config(object):
         self.glove_initializer = None
 
     def readEmbeddings(self):
-        fileName = './data/init-glove-embedding.txt'
+        fileName = './data/initSenseEmbedding.txt'
         if not os.path.exists(fileName):
             print('{} does not exist'.format(name))
             exit(2)
 
-        self.initEmbeddings = np.zeros((self.entity,self.hidden_size))
+        self.initEmbeddings = None
         with open(fileName, 'r') as fileHandler:
+            firstLine = fileHandler.readline()
+            self.initEmbeddings = np.zeros((self.entity,self.hidden_size))
             counter = 0
             for line in fileHandler:
                 arr = line.strip().split()
-                arr_list = list(map(float, arr))
-                self.initEmbeddings[counter] = arr_list
+                idx = int(arr[0])
+                arr_list = list(map(float, arr[1:]))
+                self.initEmbeddings[idx] = arr_list
                 counter += 1
 
         self.glove_initializer = tf.constant_initializer(self.initEmbeddings)

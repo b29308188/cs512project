@@ -7,13 +7,14 @@ import time
 import datetime
 import ctypes
 from utils import writeEmbedding
+import argparse
 
 ll = ctypes.cdll.LoadLibrary   
 lib = ll("./init.so")
 
 deg = 10
-outputDir = 'transE'
-regularization = False
+outputDir = 'transE-results'
+regularization = True
 embeddingFileName = '{}/model-{}.txt'.format(outputDir, deg)
 senseFileName = '{}/model-sense-{}.txt'.format(outputDir, deg)
 modelFileName = '{}/model.vec-{}'.format(outputDir, deg)
@@ -43,18 +44,21 @@ class Config(object):
         self.glove_initializer = None
 
     def readEmbeddings(self):
-        fileName = './data/init-glove-embedding.txt'
+        fileName = './data/initSenseEmbedding.txt'
         if not os.path.exists(fileName):
-            print('{} does not exist'.format(name))
+            print('{} does not exist'.format(fileName))
             exit(2)
 
-        self.initEmbeddings = np.zeros((self.entity,self.hidden_size))
+        self.initEmbeddings = None
         with open(fileName, 'r') as fileHandler:
+            firstLine = fileHandler.readline()
+            self.initEmbeddings = np.zeros((self.entity,self.hidden_size))
             counter = 0
             for line in fileHandler:
                 arr = line.strip().split()
-                arr_list = list(map(float, arr))
-                self.initEmbeddings[counter] = arr_list
+                idx = int(arr[0])
+                arr_list = list(map(float, arr[1:]))
+                self.initEmbeddings[idx] = arr_list
                 counter += 1
 
         self.glove_initializer = tf.constant_initializer(self.initEmbeddings)
@@ -208,6 +212,7 @@ def main(_):
                 if initRes is None:
                     initRes = res
                 print('epoch: {} loss: {} percentage:{:.3f}%'.format(times, res, res/initRes*100))
+                print('lossL: {} ({:.3f}%) lossR: {} ({:.3f}%'.format(lossL_t, lossL_t/rees, lossR_t, lossR_t/res))
 
                 snapshot = trainModel.ent_embeddings.eval()
                 sensesnapshot = trainModel.sense_embeddings.eval()
@@ -218,6 +223,7 @@ def main(_):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
     if not os.path.exists(outputDir):
         os.mkdir(outputDir)
     tf.app.run()
