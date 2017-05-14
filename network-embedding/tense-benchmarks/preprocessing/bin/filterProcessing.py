@@ -63,6 +63,9 @@ def  processNetwork(networkFile, gloveDict, entityDict, relationDict, networkOut
             line = line.rstrip()
             counter += 1
             head, tail, relation = line.split() 
+            if not relation in relationDict:
+                print('relation: {} is not in the dictionary.'.format(relation), file=sys.stderr)
+                exit(2)
             if head in gloveDict and tail in gloveDict:
                 checkKeyInDict(head, entityDict)
                 checkKeyInDict(tail, entityDict)

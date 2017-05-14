@@ -22,8 +22,6 @@ def createMapping(inputDict, gloveDict):
             embeddingDict[int(idx)] = embeddings
         else:
             counter += 1
-            embeddings = generateRandomEmbeddings(300)
-            continue
     if (counter + len(embeddingDict)) != len(inputDict):
         print('incorrect number of missing entities or embedding entities ...')
         exit(2)

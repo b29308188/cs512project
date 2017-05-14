@@ -54,35 +54,31 @@ void checkExistence(string fileName) {
 }
 
 extern "C" 
-void init() {
+void init(const char* relationFile, const char* entityFile, const char* tripleFile) {
 
-	string relationFile = "relation2id.txt";
-	string entityFile = "entity2id.txt";
-	string tripleFile = "triple2id.txt";
-
-	checkExistence(inPath + relationFile);
-	checkExistence(inPath + entityFile);
-	checkExistence(inPath + tripleFile);
-
+	cerr<<"read files " << relationFile << " " << entityFile << " " << tripleFile<<endl;
+	checkExistence(relationFile);
+	checkExistence(entityFile);
+	checkExistence(tripleFile);
 
 	FILE *fin;
 	int tmp;
 
-	fin = fopen((inPath + relationFile).c_str(), "r");
+	fin = fopen((relationFile), "r");
 	tmp = fscanf(fin, "%d", &relationTotal);
 	cerr << "Number of relations: " << relationTotal << endl;
 	fclose(fin);
 
 	freqRel = (int *)calloc(relationTotal, sizeof(int));
 	
-	fin = fopen((inPath + entityFile).c_str(), "r");
+	fin = fopen((entityFile), "r");
 	tmp = fscanf(fin, "%d", &entityTotal);
 	cerr << "Number of entities: " << entityTotal << endl;
 	fclose(fin);
 
 	freqEnt = (int *)calloc(entityTotal, sizeof(int));
 	
-	fin = fopen((inPath + tripleFile).c_str(), "r");
+	fin = fopen((tripleFile), "r");
 	tmp = fscanf(fin, "%d", &tripleTotal);
 	cerr << "Number of triples: " << tripleTotal << endl;
 	trainHead = (Triple *)calloc(tripleTotal, sizeof(Triple));

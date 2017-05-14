@@ -1,9 +1,3 @@
-[submodule "network-embedding/benchmarks/KB2E"]
-	path = network-embedding/benchmarks/KB2E
-	url = https://github.com/thunlp/KB2E.git
-[submodule "network-embedding/tense-benchmarks/TensorFlow-TransX"]
-	path = network-embedding/tense-benchmarks/TensorFlow-TransX
-	url = https://github.com/thunlp/TensorFlow-TransX.git
 [submodule "network-embedding/PTE"]
 	path = network-embedding/PTE
 	url = https://github.com/mnqu/PTE.git

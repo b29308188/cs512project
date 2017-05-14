@@ -6,36 +6,36 @@ import time
 import datetime
 import ctypes
 from utils import *
-import argparse
 from config import *
 
-
-modelName = 'transD-plus'
+modelName = 'transD-general'
 
 ll = ctypes.cdll.LoadLibrary   
 lib = ll("./init.so")
+
+deg = 2
 
 class TransDModel(object):
 
 	def calc(self, e, t, r):
             return e + tf.reduce_sum(e * t, 1, keep_dims = True) * r
 
-        def compute_regularization(self, entity, sense_embeddings, glove_word):
+        def compute_regularization(self, entity, sense_embedding, glove_word):
             predict_word = entity
             if self.config.enable_sense:
-                predict_word = tf.multiply(entity, sense_embeddings)
+                predict_word = tf.multiply(entity, sense_embedding)
             difference = predict_word - glove_word
             reg_loss = difference**2
             return tf.reduce_sum(reg_loss)
 
 	def __init__(self, config):
 
+            self.config = config
             entity_total = config.entity
             relation_total = config.relation
             batch_size = config.batch_size
             size = config.dimension_e
             margin = config.margin
-            self.config = config
 
             self.pos_h = tf.placeholder(tf.int32, [None])
             self.pos_t = tf.placeholder(tf.int32, [None])
@@ -44,9 +44,9 @@ class TransDModel(object):
             self.neg_h = tf.placeholder(tf.int32, [None])
             self.neg_t = tf.placeholder(tf.int32, [None])
             self.neg_r = tf.placeholder(tf.int32, [None])
-            
+
             self.glove_data = tf.get_variable(name='glove_embedding', shape = [entity_total, size], trainable=False, initializer = config.glove_initializer)
-            self.sense_embeddings = tf.get_variable(name='sense_embeddings', shape = [entity_total, size], initializer = tf.ones_initializer())
+            self.sense_embedding = tf.get_variable(name='sense_embedding', shape = [entity_total, size], initializer = tf.ones_initializer())
 
             with tf.name_scope("embedding"):
                 self.ent_embeddings = tf.get_variable(name = "ent_embedding", shape = [entity_total, size], initializer = config.glove_initializer)
@@ -79,11 +79,11 @@ class TransDModel(object):
 
             with tf.name_scope('regularization'):
 
-                pos_sense_h_e = tf.nn.embedding_lookup(self.sense_embeddings, self.pos_h) 
-                pos_sense_t_e = tf.nn.embedding_lookup(self.sense_embeddings, self.pos_t) 
+                pos_sense_h_e = tf.nn.embedding_lookup(self.sense_embedding, self.pos_h) 
+                pos_sense_t_e = tf.nn.embedding_lookup(self.sense_embedding, self.pos_t) 
 
-                neg_sense_h_e = tf.nn.embedding_lookup(self.sense_embeddings, self.neg_h) 
-                neg_sense_t_e = tf.nn.embedding_lookup(self.sense_embeddings, self.neg_t) 
+                neg_sense_h_e = tf.nn.embedding_lookup(self.sense_embedding, self.neg_h) 
+                neg_sense_t_e = tf.nn.embedding_lookup(self.sense_embedding, self.neg_t) 
 
                 reg_pos_glove_h_e = tf.nn.embedding_lookup(self.glove_data, self.pos_h)
                 reg_pos_glove_t_e = tf.nn.embedding_lookup(self.glove_data, self.pos_t) 
@@ -183,10 +183,8 @@ def main(args):
                 config.printLoss(times, res, initRes, lossL, lossR)
 
                 snapshot = trainModel.ent_embeddings.eval()
-                sense_snapshot = trainModel.sense_embeddings.eval()
                 if times%50 == 0:
                     config.writeEmbedding(snapshot)
-                    config.writeEmbedding(sense_snapshot)
 
 if __name__ == "__main__":
     tf.app.run()
