@@ -8,61 +8,19 @@ import datetime
 import ctypes
 from utils import *
 import argparse
+from config import *
+
+modelName = 'transE'
 
 ll = ctypes.cdll.LoadLibrary   
 lib = ll("./init.so")
 
-deg = 10
-outputDir = 'transE-results'
-regularization = True
-embeddingFileName = '{}/model-{}.txt'.format(outputDir, deg)
-senseFileName = '{}/model-sense-{}.txt'.format(outputDir, deg)
-modelFileName = '{}/model.vec-{}'.format(outputDir, deg)
-
 snapshot = None
-sensesnapshot = None
 flag = False
 
 def handler(signum, frame):
     print 'cleaning up things and save snapshot... '
     flag = True
-
-
-class Config(object):
-
-    def __init__(self, inputDir):
-        self.inputDir = inputDir 
-        self.L1_flag = True
-        self.hidden_size = 300
-        self.nbatches = 100
-        self.entity = 0
-        self.relation = 0
-        self.trainTimes = 3000
-        self.margin = 1.0
-        self.reg_rate = 10**(-deg)
-        self.learning_rate = 0.001
-
-        self.glove_initializer = None
-
-    def readEmbeddings(self):
-        fileName = os.path.join(self.inputDir, 'initSenseEmbedding.txt')
-        if not os.path.exists(fileName):
-            print('{} does not exist'.format(fileName))
-            exit(2)
-
-        self.initEmbeddings = None
-        with open(fileName, 'r') as fileHandler:
-            firstLine = fileHandler.readline()
-            self.initEmbeddings = np.zeros((self.entity,self.hidden_size))
-            counter = 0
-            for line in fileHandler:
-                arr = line.strip().split()
-                idx = int(arr[0])
-                arr_list = list(map(float, arr[1:]))
-                self.initEmbeddings[idx] = arr_list
-                counter += 1
-
-        self.glove_initializer = tf.constant_initializer(self.initEmbeddings)
 
 class TransEModel(object):
 
@@ -71,7 +29,7 @@ class TransEModel(object):
         entity_total = config.entity
         relation_total = config.relation
         batch_size = config.batch_size
-        size = config.hidden_size
+        size = config.dimension_e
         margin = config.margin
 
         self.pos_h = tf.placeholder(tf.int32, [None])
@@ -82,18 +40,13 @@ class TransEModel(object):
         self.neg_t = tf.placeholder(tf.int32, [None])
         self.neg_r = tf.placeholder(tf.int32, [None])
 
-    #    self.glove_data = tf.Variable(tf.constant(0.0, shape=[entity_total, size]), trainable=False, name='glove_embedding')
-
-    #    self.glove_placeholder = tf.placeholder(tf.float32, [entity_total, size])
         self.glove_data = tf.get_variable(name='glove_embedding', shape = [entity_total, size], trainable=False, initializer = config.glove_initializer)
 
         with tf.name_scope("embedding"):
 
-            #self.ent_embeddings = tf.get_variable(name = "ent_embedding", shape = [entity_total, size], initializer = tf.contrib.layers.xavier_initializer(uniform = False))
             self.ent_embeddings = tf.get_variable(name = "ent_embedding", shape = [entity_total, size],  initializer = config.glove_initializer)
             self.rel_embeddings = tf.get_variable(name = "rel_embedding", shape = [relation_total, size], initializer = tf.contrib.layers.xavier_initializer(uniform = False))
 
-            self.sense_embeddings = tf.get_variable(name = "sense_embedding", shape = [size, size], initializer = tf.contrib.layers.xavier_initializer(uniform = False))
 
             pos_h_e = tf.nn.embedding_lookup(self.ent_embeddings, self.pos_h)
             pos_t_e = tf.nn.embedding_lookup(self.ent_embeddings, self.pos_t)
@@ -104,12 +57,12 @@ class TransEModel(object):
             neg_r_e = tf.nn.embedding_lookup(self.rel_embeddings, self.neg_r)
 
             pos_glove_h_e, pos_glove_t_e,neg_glove_h_e, neg_glove_t_e = None, None, None, None
-            if regularization:
-                pos_glove_h_e = tf.nn.embedding_lookup(self.glove_data, self.pos_h)
-                pos_glove_t_e = tf.nn.embedding_lookup(self.glove_data, self.pos_t) 
 
-                neg_glove_h_e = tf.nn.embedding_lookup(self.glove_data, self.neg_h)
-                neg_glove_t_e = tf.nn.embedding_lookup(self.glove_data, self.neg_t)
+            pos_glove_h_e = tf.nn.embedding_lookup(self.glove_data, self.pos_h)
+            pos_glove_t_e = tf.nn.embedding_lookup(self.glove_data, self.pos_t) 
+
+            neg_glove_h_e = tf.nn.embedding_lookup(self.glove_data, self.neg_h)
+            neg_glove_t_e = tf.nn.embedding_lookup(self.glove_data, self.neg_t)
 
         if config.L1_flag:
             pos = tf.reduce_sum(abs(pos_h_e + pos_r_e - pos_t_e), 1, keep_dims = True)
@@ -118,37 +71,34 @@ class TransEModel(object):
             pos = tf.reduce_sum((pos_h_e + pos_r_e - pos_t_e) ** 2, 1, keep_dims = True)
             neg = tf.reduce_sum((neg_h_e + neg_r_e - neg_t_e) ** 2, 1, keep_dims = True)            
 
-        if regularization:
-            self.pos_h_reg_loss = (pos_glove_h_e - pos_h_e)*(pos_glove_h_e -  pos_h_e)
-            self.pos_t_reg_loss = (pos_glove_t_e - pos_t_e)*(pos_glove_t_e -  pos_t_e)
-            self.neg_h_reg_loss = (neg_glove_h_e - neg_h_e)*(neg_glove_h_e -  neg_h_e)
-            self.neg_t_reg_loss = (neg_glove_t_e - neg_t_e)*(neg_glove_t_e -  neg_t_e)
+        self.pos_h_reg_loss = (pos_glove_h_e - pos_h_e)*(pos_glove_h_e -  pos_h_e)
+        self.pos_t_reg_loss = (pos_glove_t_e - pos_t_e)*(pos_glove_t_e -  pos_t_e)
+        self.neg_h_reg_loss = (neg_glove_h_e - neg_h_e)*(neg_glove_h_e -  neg_h_e)
+        self.neg_t_reg_loss = (neg_glove_t_e - neg_t_e)*(neg_glove_t_e -  neg_t_e)
 
-            self.total_reg_loss = tf.reduce_sum(self.pos_h_reg_loss) + tf.reduce_sum(self.pos_t_reg_loss) + tf.reduce_sum(self.neg_h_reg_loss) + tf.reduce_sum(self.neg_t_reg_loss)
+        self.total_reg_loss = tf.reduce_sum(self.pos_h_reg_loss) + tf.reduce_sum(self.pos_t_reg_loss) + tf.reduce_sum(self.neg_h_reg_loss) + tf.reduce_sum(self.neg_t_reg_loss)
 
         with tf.name_scope("output"):
             self.lossL = tf.reduce_sum(tf.maximum(pos-neg+margin, 0))
-            self.loss = self.lossL
-            if regularization:
-                self.lossR = config.reg_rate*(self.total_reg_loss)
-                self.loss += self.lossR
+            self.lossR = config.reg_rate*(self.total_reg_loss)
+            self.loss =  self.lossL + self.lossR
+
 
 def main(args):
     
-    inputDir = args[1]
+    args = getArgs(modelName)
+    config = Config(args.inputDir, args.outputDir)
+    config.set_regularization(args.reg_deg)
+    config.nbatches = args.batches
+    config.random_init = args.random_init
     
-    relationFile = os.path.join(inputDir, 'relation2id.txt')
-    entityFile = os.path.join(inputDir, 'entity2id.txt')
-    tripleFile = os.path.join(inputDir, 'triple2id.txt')
+    lib.init(config.relationFile, config.entityFile, config.tripleFile)
 
-    checkExistenceExit(relationFile, entityFile, tripleFile)
-
-    lib.init(relationFile, entityFile, tripleFile)
-    config = Config(inputDir)
     config.relation = lib.getRelationTotal()
     config.entity = lib.getEntityTotal()
     config.batch_size = lib.getTripleTotal() / config.nbatches
     config.readEmbeddings()
+    config.Print()
 
     with tf.Graph().as_default():
         sess = tf.Session()
@@ -164,9 +114,6 @@ def main(args):
             saver = tf.train.Saver()
             sess.run(tf.global_variables_initializer())
 
-           # initStep = trainModel.glove_data.assign(trainModel.glove_placeholder)
-           # sess.run(initStep, feed_dict ={trainModel.glove_placeholder:config.initEmbeddings})
-
             def train_step(pos_h_batch, pos_t_batch, pos_r_batch, neg_h_batch, neg_t_batch, neg_r_batch):
                 feed_dict = {
                     trainModel.pos_h: pos_h_batch,
@@ -176,13 +123,9 @@ def main(args):
                     trainModel.neg_t: neg_t_batch,
                     trainModel.neg_r: neg_r_batch
                 }
-                if regularization:
-                    _, step, loss, lossL, lossR = sess.run(
-                        [train_op, global_step, trainModel.loss, trainModel.lossL, trainModel.lossR], feed_dict)
-                    return loss, lossL, lossR
-                _, step, loss, lossL = sess.run(
-                    [train_op, global_step, trainModel.loss, trainModel.lossL], feed_dict)
-                return loss, lossL
+                _, step, loss, lossL, lossR = sess.run(
+                    [train_op, global_step, trainModel.loss, trainModel.lossL, trainModel.lossR], feed_dict)
+                return loss, lossL, lossR
 
             ph = np.zeros(config.batch_size, dtype = np.int32)
             pt = np.zeros(config.batch_size, dtype = np.int32)
@@ -205,15 +148,12 @@ def main(args):
                 lossL_t, lossR_t = 0, 0
                 for batch in range(config.nbatches):
                     lib.getBatch(ph_addr, pt_addr, pr_addr, nh_addr, nt_addr, nr_addr, config.batch_size)
-                    if regularization:
-                        loss, lossL, lossR= train_step(ph, pt, pr, nh, nt, nr)
-                    else:
-                        loss, lossL = train_step(ph, pt, pr, nh, nt, nr)
+                    loss, lossL, lossR= train_step(ph, pt, pr, nh, nt, nr)
 
                     res += loss
                     lossL_t += lossL
-                    if regularization:
-                        lossR_t += lossR
+                    lossR_t += lossR
+
                     current_step = tf.train.global_step(sess, global_step)
                     if flag == True:
                         break
@@ -221,20 +161,13 @@ def main(args):
                     break
                 if initRes is None:
                     initRes = res
-                print('epoch: {} loss: {} percentage:{:.3f}%'.format(times, res, res/initRes*100))
-                print('lossL: {} ({:.3f}%) lossR: {} ({:.3f}%'.format(lossL_t, lossL_t/res, lossR_t, lossR_t/res))
+                config.printLoss(times, res, initRes, lossL, lossR)
 
                 snapshot = trainModel.ent_embeddings.eval()
-                sensesnapshot = trainModel.sense_embeddings.eval()
                 if times%50 == 0:
-                    writeEmbedding(snapshot, embeddingFileName)
-#                    writeEmbedding(sensesnapshot, senseFileName)
-                    saver.save(sess, modelFileName)         
+                    config.writeEmbedding(snapshot)
 
 
 if __name__ == "__main__":
-    if not os.path.exists(outputDir):
-        os.mkdir(outputDir)
     tf.app.run()
-    writeEmbeddings(snapshot, embeddingFileName)
 

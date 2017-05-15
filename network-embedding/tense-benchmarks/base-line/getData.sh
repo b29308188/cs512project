@@ -1,3 +1,8 @@
+"""
+The sceript copy the files needed for training network embeddigns from 
+preprocessing directory
+"""
+
 #!/bin/bash
 
 echo 'removing old data directory ...'

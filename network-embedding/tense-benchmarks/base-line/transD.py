@@ -5,49 +5,15 @@ import os
 import time
 import datetime
 import ctypes
-from utils import writeEmbedding
+from utils import *
+from config import *
+
+modelName = 'transD-general'
 
 ll = ctypes.cdll.LoadLibrary   
 lib = ll("./init.so")
 
 deg = 2
-outputDir = 'transD-regularization-results'
-embeddingFileName = '{}/reg-{}'.format(outputDir, deg)
-modelFileName = '{}/model.vec-adam-{}'.format(outputDir, deg)
-
-class Config(object):
-    def __init__(self):
-        self.L1_flag = True
-        self.hidden_size = 300
-        self.nbatches = 100
-        self.entity = 0
-        self.relation = 0
-        self.trainTimes = 3000
-        self.margin = 1.0
-        self.reg_rate = 10**(-deg)
-        self.learning_rate = 0.001
-        self.glove_initializer = None
-        self.enable_sense = False
-
-    def readEmbeddings(self):
-        fileName = './data/initSenseEmbedding.txt'
-        if not os.path.exists(fileName):
-            print('{} does not exist'.format(name))
-            exit(2)
-
-        self.initEmbeddings = None
-        with open(fileName, 'r') as fileHandler:
-            firstLine = fileHandler.readline()
-            self.initEmbeddings = np.zeros((self.entity,self.hidden_size))
-            counter = 0
-            for line in fileHandler:
-                arr = line.strip().split()
-                idx = int(arr[0])
-                arr_list = list(map(float, arr[1:]))
-                self.initEmbeddings[idx] = arr_list
-                counter += 1
-
-        self.glove_initializer = tf.constant_initializer(self.initEmbeddings)
 
 class TransDModel(object):
 
@@ -64,15 +30,12 @@ class TransDModel(object):
 
 	def __init__(self, config):
 
+            self.config = config
             entity_total = config.entity
             relation_total = config.relation
             batch_size = config.batch_size
-            size = config.hidden_size
+            size = config.dimension_e
             margin = config.margin
-            self.config = config
-
-            self.glove_data = tf.get_variable(name='glove_embedding', shape = [entity_total, size], trainable=False, initializer = config.glove_initializer)
-            self.sense_embedding = tf.get_variable(name='sense_embedding', shape = [entity_total, size], initializer = tf.ones_initializer())
 
             self.pos_h = tf.placeholder(tf.int32, [None])
             self.pos_t = tf.placeholder(tf.int32, [None])
@@ -81,6 +44,9 @@ class TransDModel(object):
             self.neg_h = tf.placeholder(tf.int32, [None])
             self.neg_t = tf.placeholder(tf.int32, [None])
             self.neg_r = tf.placeholder(tf.int32, [None])
+
+            self.glove_data = tf.get_variable(name='glove_embedding', shape = [entity_total, size], trainable=False, initializer = config.glove_initializer)
+            self.sense_embedding = tf.get_variable(name='sense_embedding', shape = [entity_total, size], initializer = tf.ones_initializer())
 
             with tf.name_scope("embedding"):
                 self.ent_embeddings = tf.get_variable(name = "ent_embedding", shape = [entity_total, size], initializer = config.glove_initializer)
@@ -146,20 +112,19 @@ class TransDModel(object):
 
 def main(args):
     
-    inputDir = args[1]
+    args = getArgs(modelName)
+    config = Config(args.inputDir, args.outputDir)
+    config.set_regularization(args.reg_deg)
+    config.nbatches = args.batches
+    config.random_init = args.random_init
     
-    relationFile = os.path.join(inputDir, 'relation2id.txt')
-    entityFile = os.path.join(inputDir, 'entity2id.txt')
-    tripleFile = os.path.join(inputDir, 'triple2id.txt')
+    lib.init(config.relationFile, config.entityFile, config.tripleFile)
 
-    checkExistenceExit(relationFile, entityFile, tripleFile)
-
-    lib.init(relationFile, entityFile, tripleFile)
-    config = Config(inputDir)
     config.relation = lib.getRelationTotal()
     config.entity = lib.getEntityTotal()
     config.batch_size = lib.getTripleTotal() / config.nbatches
     config.readEmbeddings()
+    config.Print()
 
     with tf.Graph().as_default():
         sess = tf.Session()
@@ -215,16 +180,12 @@ def main(args):
                 if initRes is None:
                     initRes, initL = res, lossL_t
                     initR = lossR_t
-                print('epoch: {} loss:{:.3f} percentage:{:.3f}%'.format(times, res, res/initRes*100))
-                print('lossL: {:.3f}({:.3f}%) lossR: {:.3f}({:.3f}%)'.format(lossL_t, lossL_t/res*100,lossR_t, lossR_t/res*100))
+                config.printLoss(times, res, initRes, lossL, lossR)
 
                 snapshot = trainModel.ent_embeddings.eval()
                 if times%50 == 0:
-                    writeEmbedding(snapshot, embeddingFileName)
-                    saver.save(sess, modelFileName)
+                    config.writeEmbedding(snapshot)
 
 if __name__ == "__main__":
-    if not os.path.exists(outputDir):
-        os.mkdir(outputDir)
     tf.app.run()
 
